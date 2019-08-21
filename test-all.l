@@ -1,0 +1,5 @@
+`(== 64 64)
+(load "test-funcs.l")
+(load "test-phase1.l")
+(msg 'OK-All)
+(bye)
