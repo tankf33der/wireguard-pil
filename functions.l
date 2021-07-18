@@ -16,7 +16,7 @@
    # full ip-icmp packet, stolen
    *PING_DATA
       (69 0 0 37 0 0 0 0 20 1 143 91 10 189 129 2 10 189 129 1 8 0
-         27 250 3 153 1 182 87 105 114 101 71 117 97 114 100 0 0 0 
+         27 250 3 153 1 182 87 105 114 101 71 117 97 114 100 0 0 0
          0 0 0 0 0 0 0 0 ) )
 (def 'prv car)
 (def 'pub cadr)
@@ -28,7 +28,7 @@
    (let Key (copy Key)
       (and
          (> (length Key) 64)
-         (setq Key (blake2s Key)) ) 
+         (setq Key (blake2s Key)) )
       (setq Key (need -64 Key 0))
       (blake2s
          (conc
@@ -44,17 +44,17 @@
    (let Z (hmac C D)
       (list
          (setq @ (hmac Z (cons 1)))
-         (hmac Z (append @ (cons 2))) ) ) ) 
+         (hmac Z (append @ (cons 2))) ) ) )
 (de kdf3 (C D)
    (let Z (hmac C D)
       (list
          (setq @ (hmac Z (cons 1)))
          (setq @ (hmac Z (append @ (cons 2))))
-         (hmac Z (append @ (cons 3))) ) ) ) 
+         (hmac Z (append @ (cons 3))) ) ) )
 (de dh_pubkey (S)
    (use P
       (native
-         "libmonocypher.so.2"
+         "libmonocypher.so"
          "crypto_x25519_public_key"
          NIL
          '(P (32 B . 32))
@@ -63,26 +63,26 @@
 (de dh (S P)
    (use R
       (native
-         "libmonocypher.so.2"
+         "libmonocypher.so"
          "crypto_x25519"
          'I
          '(R (32 B . 32))
          (cons NIL (32) S)
          (cons NIL (32) P) )
-      R ) ) 
+      R ) )
 (de lock_aead (K N P A)
-   (let 
+   (let
       (AL (length A)
          PL (length P)
          Mac NIL
          CH NIL )
       (native
-         "libmonocypher.so.2"
+         "libmonocypher.so"
          "crypto_lock_aead"
          NIL
          '(Mac (16 B . 16))
          (if P  # for empty plain data
-            (list 'CH (cons PL 'B PL)) 
+            (list 'CH (cons PL 'B PL))
             0 )
          (cons NIL (32) K)
          (cons NIL (12) N)
@@ -98,11 +98,11 @@
          CL (- (length C) 16)
          P NIL)
       (native
-         "libmonocypher.so.2"
+         "libmonocypher.so"
          "crypto_unlock_aead"
          'I
-         (if (=0 CL)  # for empty crypted 
-            @ 
+         (if (=0 CL)  # for empty crypted
+            @
             (list 'P (cons CL 'B CL)) )
          (cons NIL (32) K)
          (cons NIL (12) N)
@@ -114,7 +114,7 @@
       P ) )
 (de tai64n NIL
    (let
-      (S 
+      (S
          (+
             4611686018427387914
             (-
@@ -145,12 +145,12 @@
          (yoke (& N 255))
          (setq N (>> 8 N)) ) ) )
 (de socket NIL
-   (native 
-      "@" 
-      "socket" 
-      'I 
-      *PF_INET 
-      *SOCK_DGRAM 
+   (native
+      "@"
+      "socket"
+      'I
+      *PF_INET
+      *SOCK_DGRAM
       17 # IPPROTO_UDP
    ) )
 (de getaddrinfo (Host Port)
@@ -160,11 +160,11 @@
       (native "@" "getaddrinfo" NIL Host Port Hints '(Res (8 . N) . 0))
       (native "@" "free" NIL Hints)
       (struct
-         Res 
+         Res
          '(I I I I I I N N N) ) ) )
 (de server (Host Port)
    (let R (getaddrinfo Host Port)
-      (list 
+      (list
          (socket)
          (get R 7) # ai_addr
          (get R 5) # ai_addrlen
@@ -180,7 +180,7 @@
          BL
          0
          (cadr S)
-         (caddr S) ) ) )  
+         (caddr S) ) ) )
 (de recvfrom (S) # without return check
    (let
       (Buf NIL
@@ -201,14 +201,14 @@
       (link 1 0 0 0)
       (chain (little32 28))
       (chain (pub *E))
-      (setq 
+      (setq
          *C (kdf1 *C (pub *E))
-         *H (hash32 (append *H (pub *E))) 
+         *H (hash32 (append *H (pub *E)))
          @  (kdf2 *C (dh (prv *E) *RPub))
          *C (car @)
          *K (cadr @) )
       (chain (setq @ (lock_aead *K (nonce 0) *Pub *H)))
-      (setq 
+      (setq
          *H (hash32 (append *H @))
          # starting for tai64n
          @  (kdf2 *C (dh *Prv *RPub))
@@ -224,7 +224,7 @@
 (de fin-handshake (Lst)
    (let
       (Er (head 32 (nth Lst 13))
-         Crypted (head 16 (nth Lst 45)) 
+         Crypted (head 16 (nth Lst 45))
          Mac1 (head 16 (nth Lst 61))
          Empty T )
       (test (2 0 0 0) (head 4 Lst))
@@ -254,21 +254,21 @@
 (de encryption (D)
    (make
       (link 4 0 0 0)
-      (chain 
+      (chain
          (copy *IndexR)
          (little64 *Nsend)
-         (lock_aead 
+         (lock_aead
             *Enc
             (nonce (swap '*Nsend (+ 1 *Nsend)))
-            D 
-            NIL ) ) ) ) 
+            D
+            NIL ) ) ) )
 (de decryption (Lst) # full packet
    # header and index's first byte
    (test (4 0 0 0 28) (head 5 Lst))
    # extra check for synced counter
    (test (head 8 (nth Lst 9)) (little64 *Nrecv))
-   (unlock_aead 
-      *Dec 
+   (unlock_aead
+      *Dec
       (nonce (swap '*Nrecv (+ 1 *Nrecv)))
       (nth Lst 17)
       NIL ) )
